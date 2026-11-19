@@ -1,4 +1,4 @@
-﻿asgiref==3.11.1
+asgiref==3.11.1
 cffi==2.0.0
 charset-normalizer==3.4.7
 cryptography==47.0.0
@@ -8,7 +8,6 @@ djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 et_xmlfile==2.0.0
 gunicorn==27.0.1
-mysqlclient==2.2.8
 openpyxl==3.1.5
 pillow==12.2.0
 pycparser==3.0
