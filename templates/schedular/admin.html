@@ -1,0 +1,693 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — EduSchedule</title>
+<link rel="stylesheet" href="{% static 'css/shared.css' %}">
+<style>
+.mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.mini-stat{background:#FDF5F7;border-radius:12px;padding:14px;text-align:center}
+.mini-stat h3{font-size:11px;color:var(--muted);margin-bottom:4px}
+.mini-stat .n{font-size:22px;font-weight:700}
+.tt-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chip{padding:6px 14px;border-radius:20px;background:#F8EEF1;font-size:12px;font-weight:600;cursor:pointer;border:none;color:var(--muted);transition:.2s}
+.chip.active{background:var(--grad);color:#fff}
+.generate-form{display:inline;}
+
+/* ── Timetable generation log ───────────────────────────── */
+.gen-log-box{
+  margin:0 32px 16px;
+  border-radius:14px;
+  overflow:hidden;
+  border:1px solid #EDD9DF;
+}
+.gen-log-box.success{ border-left:5px solid #9CB59A; }
+.gen-log-box.failure{ border-left:5px solid #B5567A; }
+.gen-log-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 18px;
+  background:#FDF5F7;
+  cursor:pointer;
+  font-weight:700;
+  font-size:14px;
+}
+.gen-log-header .toggle-icon{
+  font-size:12px;
+  color:var(--muted);
+  transition:transform .2s;
+}
+.gen-log-header.collapsed .toggle-icon{ transform:rotate(-90deg); }
+.gen-log-body{
+  max-height:420px;
+  overflow-y:auto;
+  background:#3D2A38;
+  color:#EDD9DF;
+  padding:16px 18px;
+  font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  font-size:12.5px;
+  line-height:1.6;
+  white-space:pre-wrap;
+}
+.gen-log-body.hidden{ display:none; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📅</div>
+    <span>EduSchedule</span>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="nav-item active" onclick="showPage('dashboard',this)">
+      <span class="nav-icon">🏠</span> Dashboard
+    </button>
+    <button class="nav-item" onclick="showPage('timetables',this)">
+      <span class="nav-icon">📋</span> All Timetables
+    </button>
+    <button class="nav-item" onclick="showPage('faculty',this)">
+      <span class="nav-icon">👨‍🏫</span> Faculty
+    </button>
+    <button class="nav-item" onclick="showPage('rooms',this)">
+      <span class="nav-icon">🏫</span> Rooms
+    </button>
+    <button class="nav-item" onclick="showPage('leaves',this)">
+      <span class="nav-icon">📝</span> Leave Requests
+      {% if pending_leaves %}
+        <span class="badge badge-red" style="margin-left:auto">{{ pending_leaves|length }}</span>
+      {% endif %}
+    </button>
+    <button class="nav-item" onclick="showPage('settings',this)">
+      <span class="nav-icon">⚙️</span> Settings
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="avatar purple">{{ request.user.username|first|upper }}</div>
+      <div class="user-info">
+        <h4>{{ request.user.get_full_name|default:request.user.username }}</h4>
+        <p>Administrator</p>
+        <a class="logout-btn" href="{% url 'logout' %}">Logout →</a>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="pageTitle">Dashboard</span>
+    <div class="topbar-right">
+      <button class="notif-btn">🔔<span class="notif-dot"></span></button>
+      <form method="POST" action="{% url 'generate_timetable' %}" class="generate-form" id="genForm">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary" id="topGenBtn" onclick="return confirmGenerate()">
+          ⚡ Generate New Timetable
+        </button>
+        
+      </form>
+    </div>
+  </div>
+
+  {% if messages %}
+  <div style="padding:12px 32px 0">
+    {% for message in messages %}
+    <div class="alert {% if message.tags == 'error' %}alert-error{% elif message.tags == 'warning' %}alert-warn{% else %}alert-success{% endif %}" style="margin-bottom:8px">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ========== TIMETABLE GENERATION LOG ==========
+       FIX: this block was missing entirely before — generate_timetable()
+       always produced a detailed log_text (✅/⚠/DEBUG lines explaining
+       exactly what got scheduled and what failed), but views.py only sent
+       it to the server console logger. It never reached the browser, so
+       failures were invisible. admin_dashboard() now passes generation_log
+       and generation_success via request.session (popped once so it only
+       shows right after a generation attempt). This block renders it. 
+  {% if generation_log %}
+  <div class="gen-log-box {% if generation_success %}success{% else %}failure{% endif %}" style="margin-top:12px">
+    <div class="gen-log-header" id="genLogHeader" onclick="toggleGenLog()">
+      <span>
+        {% if generation_success %}✅ Timetable Generation Log{% else %}❌ Timetable Generation Failed — Log{% endif %}
+      </span>
+      <span class="toggle-icon" id="genLogToggleIcon">▼</span>
+    </div>
+    <pre class="gen-log-body" id="genLogBody">{{ generation_log }}</pre>
+  </div>
+  {% endif %}
+
+  <div class="page-wrap"> -->
+
+    <!-- ========== DASHBOARD ========== -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h1>Welcome back, {{ request.user.get_full_name|default:"Admin" }} 👋</h1>
+        <p>Here's what's happening today</p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card" style="background:linear-gradient(135deg,#F2C9D4,#9C5476)">
+          <div class="stat-icon">👨‍🏫</div>
+          <h3>Total Faculty</h3>
+          <div class="stat-num">{{ faculty }}</div>
+          <div class="stat-sub">Across all departments</div>
+        </div>
+        <div class="stat-card" style="background:linear-gradient(135deg,#9CB59A,#6B8E76)">
+          <div class="stat-icon">📚</div>
+          <h3>Total Subjects</h3>
+          <div class="stat-num">{{ subjects }}</div>
+          <div class="stat-sub">Configured in system</div>
+        </div>
+        <div class="stat-card" style="background:linear-gradient(135deg,#C9B3BE,#8C7683)">
+          <div class="stat-icon">👥</div>
+          <h3>Sections</h3>
+          <div class="stat-num">{{ sections }}</div>
+          <div class="stat-sub">Active this semester</div>
+        </div>
+        <div class="stat-card" style="background:linear-gradient(135deg,#DDBB7E,#B87D3F)">
+          <div class="stat-icon">📄</div>
+          <h3>Pending Leaves</h3>
+          <div class="stat-num">{{ pending_leaves|length }}</div>
+          <div class="stat-sub">Awaiting approval</div>
+        </div>
+      </div>
+
+      <!-- Timetable Overview (full width) -->
+      <div class="box" style="margin-bottom:20px">
+        <div class="box-header">
+          <h2>Schedule Overview</h2>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="filter-select" id="dashYear"></select>
+            <select class="filter-select" id="dashSemester"></select>
+            <select class="filter-select" id="dashSection"></select>
+            <button class="btn btn-outline btn-sm" onclick="showPage('timetables',null)">View All</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="tt-table" id="dashGrid">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>P1 9:00</th>
+                <th>P2 10:00</th>
+                <th>P3 11:00</th>
+                <th>P4 12:00</th>
+                <th>P5 14:00</th>
+                <th>P6 15:00</th>
+                <th>P6 16:00</th>                 
+              </tr>
+            </thead>
+            <tbody id="dashGridBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Leave Requests (own row, sized to content) -->
+      <div class="box">
+        <div class="box-header">
+          <h2>Pending Leave Requests</h2>
+          <button class="btn btn-outline btn-sm" onclick="showPage('leaves',null)">View All</button>
+        </div>
+        {% if pending_leaves %}
+          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:14px">
+            {% for leave in pending_leaves %}
+            <div class="leave-card" style="border-left-color:#DDBB7E;margin-bottom:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <h4>{{ leave.faculty.name }}</h4>
+                <span class="badge badge-yellow">⏳ Pending</span>
+              </div>
+              <p>📅 {{ leave.date }}</p>
+              <p>{{ leave.reason|truncatechars:60 }}</p>
+              <div class="leave-actions" style="margin-top:10px">
+                <form method="POST" action="{% url 'approve_leave' leave.id %}" style="display:inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-success btn-sm">✓ Approve</button>
+                </form>
+                <form method="POST" action="{% url 'reject_leave' leave.id %}" style="display:inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger btn-sm">✗ Reject</button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="no-data">No pending leave requests</p>
+        {% endif %}
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <div class="qa-card" onclick="window.location.href='{% url 'admin:schedular_faculty_changelist' %}'">
+          <span class="qa-icon">👤</span>
+          <div><h4>Add Faculty</h4><p>Manage staff</p></div>
+        </div>
+         <div class="qa-card" onclick="window.location.href='{% url 'all_faculty_timetables_list' %}'">
+          <span class="qa-icon">📅</span>
+          <div><h4>view individual faculty timetables</h4><p>timetables</p></div>
+        </div>
+        <div class="qa-card" onclick="document.getElementById('genForm').submit()">
+          <span class="qa-icon">📋</span>
+          <div><h4>Generate Timetable</h4><p>Auto-schedule</p></div>
+        </div>
+        <div class="qa-card" onclick="window.location.href='{% url 'admin:schedular_room_changelist' %}'">
+          <span class="qa-icon">🏫</span>
+          <div><h4>Manage Rooms</h4><p>Room allocations</p></div>
+        </div>
+        <div class="qa-card" onclick="window.location.href='{% url 'export_pdf' %}'">
+          <span class="qa-icon">📊</span>
+          <div><h4>Export PDF</h4><p>Download timetable</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== TIMETABLES ========== -->
+    <div class="page" id="page-timetables">
+      <div class="page-header">
+        <h1>All Timetables</h1>
+        <p>View and manage schedules by section</p>
+      </div>
+      <div class="box">
+        <div class="box-header">
+          <h2>Timetable Grid</h2>
+          <div class="tt-controls">
+            <select class="filter-select" id="ttYear"></select>
+            <select class="filter-select" id="ttSemester"></select>
+            <select class="filter-select" id="ttSection"></select>
+            <form method="POST" action="{% url 'generate_timetable' %}" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-primary btn-sm" onclick="return confirmGenerate()">⚡ Generate</button>
+            </form>
+
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="tt-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>P1 9:00–10:00</th>
+                <th>P2 10:00–11:00</th>
+                <th>P3 11:00–12:00</th>
+                <th>P4 12:00–13:00</th>
+                <th>P5 14:00–15:00</th>
+                <th>P6 15:00–16:00</th>
+              </tr>
+            </thead>
+            <tbody id="ttGridBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== FACULTY ========== -->
+    <div class="page" id="page-faculty">
+      <div class="page-header">
+        <h1>Faculty</h1>
+        <p>Manage faculty members and assignments</p>
+      </div>
+      <div class="box">
+        <div class="box-header">
+          <h2>All Faculty</h2>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="search-box">
+              <span>🔍</span>
+              <input placeholder="Search faculty..." oninput="filterFaculty(this.value)">
+            </div>
+            <a href="{% url 'admin:schedular_faculty_add' %}" class="btn btn-primary btn-sm">+ Add Faculty</a>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Name</th><th>Email</th><th>Workload Limit</th><th>Subjects</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="facultyBody">
+              {% for f in faculty_list %}
+              <tr class="faculty-row" data-name="{{ f.name|lower }}">
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div class="avatar purple" style="width:34px;height:34px;font-size:13px">{{ f.name|first|upper }}</div>
+                    <div style="font-weight:600;font-size:13px">{{ f.name }}</div>
+                  </div>
+                </td>
+                <td style="font-size:13px">{{ f.email }}</td>
+                <td style="text-align:center;font-weight:600">{{ f.workload_limit }}</td>
+                <td style="font-size:12px;color:var(--muted)">
+                  {% for fs in f.facultysubject_set.all %}{{ fs.subject.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                </td>
+                <td>
+                  <a href="{% url 'admin:schedular_faculty_change' f.id %}" class="btn btn-outline btn-sm">Edit</a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="no-data">No faculty found. <a href="{% url 'admin:schedular_faculty_add' %}">Add one</a></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== ROOMS ========== -->
+    <div class="page" id="page-rooms">
+      <div class="page-header">
+        <h1>Rooms</h1>
+        <p>View classroom and lab availability</p>
+      </div>
+      <div class="box">
+        <div class="box-header">
+          <h2>Room Status</h2>
+          <a href="{% url 'admin:schedular_room_add' %}" class="btn btn-primary btn-sm">+ Add Room</a>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Room</th><th>Type</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {% for room in room_list %}
+              <tr>
+                <td style="font-weight:600;font-size:13px">{{ room.name }}</td>
+                <td>
+                  <span class="badge {% if room.is_lab %}badge-blue{% else %}badge-purple{% endif %}">
+                    {% if room.is_lab %}🧪 Lab{% else %}🏫 Classroom{% endif %}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge badge-green">🟢 Available</span>
+                </td>
+                <td>
+                  <a href="{% url 'admin:schedular_room_change' room.id %}" class="btn btn-outline btn-sm">Edit</a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="no-data">No rooms found. <a href="{% url 'admin:schedular_room_add' %}">Add one</a></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== LEAVE REQUESTS ========== -->
+    <div class="page" id="page-leaves">
+      <div class="page-header">
+        <h1>Leave Requests</h1>
+        <p>Manage faculty leave applications</p>
+      </div>
+      <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card" style="background:linear-gradient(135deg,#DDBB7E,#B87D3F)">
+          <h3>Pending</h3><div class="stat-num">{{ pending_count }}</div>
+        </div>
+        <div class="stat-card" style="background:linear-gradient(135deg,#9CB59A,#6B8E76)">
+          <h3>Approved</h3><div class="stat-num">{{ approved_count }}</div>
+        </div>
+        <div class="stat-card" style="background:linear-gradient(135deg,#F2C9D4,#9C5476)">
+          <h3>Rejected</h3><div class="stat-num">{{ rejected_count }}</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">
+          <h2>All Leave Requests</h2>
+          <div style="display:flex;gap:8px">
+            <button class="chip active" onclick="filterLeaveDisplay('all',this)">All</button>
+            <button class="chip" onclick="filterLeaveDisplay('pending',this)">Pending</button>
+            <button class="chip" onclick="filterLeaveDisplay('approved',this)">Approved</button>
+            <button class="chip" onclick="filterLeaveDisplay('rejected',this)">Rejected</button>
+          </div>
+        </div>
+        <div id="leavesContainer">
+          {% for leave in all_leaves %}
+          <div class="leave-card leave-item"
+               data-status="{% if leave.approved %}approved{% elif leave.rejected %}rejected{% else %}pending{% endif %}"
+               style="border-left-color:{% if leave.approved %}#9CB59A{% elif leave.rejected %}#B5567A{% else %}#DDBB7E{% endif %}">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <h4>{{ leave.faculty.name }}</h4>
+              <span class="badge {% if leave.approved %}badge-green{% elif leave.rejected %}badge-red{% else %}badge-yellow{% endif %}">
+                {% if leave.approved %}✅ Approved{% elif leave.rejected %}❌ Rejected{% else %}⏳ Pending{% endif %}
+              </span>
+            </div>
+            <p>📅 {{ leave.date }}</p>
+            <p style="margin-bottom:10px">{{ leave.reason }}</p>
+            {% if not leave.approved and not leave.rejected %}
+            <div class="leave-actions">
+              <form method="POST" action="{% url 'approve_leave' leave.id %}" style="display:inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success btn-sm">✓ Approve</button>
+              </form>
+              <form method="POST" action="{% url 'reject_leave' leave.id %}" style="display:inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm">✗ Reject</button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+          {% empty %}
+          <p class="no-data">No leave requests found</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== SETTINGS ========== -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <h1>Settings</h1>
+        <p>System configuration and preferences</p>
+      </div>
+      <div class="grid-2">
+        <div class="box">
+          <h2 class="box-title">Quick Links</h2>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <a href="{% url 'admin:schedular_department_changelist' %}" class="btn btn-outline" style="text-align:left">🏢 Manage Departments</a>
+            <a href="{% url 'admin:schedular_semester_changelist' %}" class="btn btn-outline" style="text-align:left">📅 Manage Semesters</a>
+            <a href="{% url 'admin:schedular_section_changelist' %}" class="btn btn-outline" style="text-align:left">👥 Manage Sections</a>
+            <a href="{% url 'admin:schedular_subject_changelist' %}" class="btn btn-outline" style="text-align:left">📚 Manage Subjects</a>
+            <a href="{% url 'admin:schedular_timeslot_changelist' %}" class="btn btn-outline" style="text-align:left">⏰ Manage Time Slots</a>
+            <a href="{% url 'admin:schedular_batch_changelist' %}" class="btn btn-outline" style="text-align:left">🧪 Manage Batches</a>
+            <a href="{% url 'admin:schedular_facultysubject_changelist' %}" class="btn btn-outline" style="text-align:left">🔗 Faculty-Subject Mapping</a>
+          </div>
+        </div>
+        <div class="box">
+          <h2 class="box-title">Data Export</h2>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <a href="{% url 'export_pdf' %}" class="btn btn-primary">📄 Export Timetable PDF</a>
+          </div>
+          <div style="margin-top:24px">
+            <h2 class="box-title">System Info</h2>
+            <p style="font-size:13px;color:var(--muted)">EduSchedule v2.0 — Django Backend</p>
+            <p style="font-size:13px;color:var(--muted);margin-top:6px">Total schedules: <strong>{{ schedules|length }}</strong></p>
+            <p style="font-size:13px;color:var(--muted);margin-top:6px">Rooms: <strong>{{ rooms }}</strong></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /page-wrap -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- TOAST -->
+<div id="toast" style="position:fixed;bottom:24px;right:24px;background:#3D2A38;color:#fff;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:600;display:none;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.2)"></div>
+
+<script>
+// ---- TIMETABLE DATA FROM DJANGO ----
+const SCHEDULE_DATA = {
+  {% for s in section_list %}
+  "{{ s.id }}": {
+    {% for day_abbr, day_name in day_choices %}
+    "{{ day_abbr }}": [
+      {% for slot_num in slot_numbers %}
+        {% with key=day_abbr|add:"-"|add:slot_num|stringformat:"s" %}
+        {% for sch in schedules %}
+          {% if sch.section_id == s.id and sch.timeslot.day == day_abbr and sch.timeslot.slot_number == slot_num %}
+            "{{ sch.subject.name }}|{{ sch.faculty.name }}|{{ sch.room.name }}{% if sch.subject.is_lab %}|LAB{% endif %}",
+          {% endif %}
+        {% endfor %}
+        {% endwith %}
+      {% endfor %}
+    ],
+    {% endfor %}
+  },
+  {% endfor %}
+};
+
+// Build a per-section, per-day, per-slot lookup
+const SECTION_SCHEDULE = {};
+{% for sch in schedules %}
+(function(){
+  const secId = "{{ sch.section_id }}";
+  const day = "{{ sch.timeslot.day }}";
+  const slot = {{ sch.timeslot.slot_number }};
+  if(!SECTION_SCHEDULE[secId]) SECTION_SCHEDULE[secId] = {};
+  if(!SECTION_SCHEDULE[secId][day]) SECTION_SCHEDULE[secId][day] = {};
+  if(!SECTION_SCHEDULE[secId][day][slot]) SECTION_SCHEDULE[secId][day][slot] = [];
+  SECTION_SCHEDULE[secId][day][slot].push({
+    sub: "{{ sch.subject.name|escapejs }}",
+    fac: "{{ sch.faculty.name|escapejs }}",
+    room: "{{ sch.room.name|escapejs }}",
+    lab: {% if sch.subject.is_lab %}true{% else %}false{% endif %}
+  });
+})();
+{% endfor %}
+
+const DAYS = ['MON','TUE','WED','THU','FRI','SAT'];
+const DAY_LABELS = {MON:'Monday',TUE:'Tuesday',WED:'Wednesday',THU:'Thursday',FRI:'Friday',SAT:'Saturday'};
+const SLOTS = [1,2,3,4,5,6,7];
+
+// ---- YEAR / SEMESTER / SECTION metadata ----
+const SECTIONS_META = [
+  {% for s in section_list %}
+  { id: "{{ s.id }}", name: "{{ s.name|escapejs }}", sem: {{ s.semester.number|default:0 }} },
+  {% endfor %}
+];
+
+const YEAR_ORDER = ['I','II','III','IV'];
+function yearOfSem(sem){
+  if(sem <= 2) return 'I';
+  if(sem <= 4) return 'II';
+  if(sem <= 6) return 'III';
+  return 'IV';
+}
+
+function initYearSemSectionCascade(yearId, semId, secId, onFinal){
+  const yearEl = document.getElementById(yearId);
+  const semEl = document.getElementById(semId);
+  const secEl = document.getElementById(secId);
+  if(!yearEl || !semEl || !secEl) return;
+
+  const years = YEAR_ORDER.filter(y => SECTIONS_META.some(s => yearOfSem(s.sem) === y));
+  yearEl.innerHTML = years.length
+    ? years.map(y => `<option value="${y}">${y} Year</option>`).join('')
+    : '<option>No Data</option>';
+
+  function populateSem(){
+    const y = yearEl.value;
+    const sems = [...new Set(SECTIONS_META.filter(s => yearOfSem(s.sem) === y).map(s => s.sem))].sort((a,b) => a-b);
+    semEl.innerHTML = sems.length
+      ? sems.map(sm => `<option value="${sm}">Semester ${sm}</option>`).join('')
+      : '<option>No Data</option>';
+    populateSec();
+  }
+
+  function populateSec(){
+    const sm = parseInt(semEl.value, 10);
+    const secs = SECTIONS_META.filter(s => s.sem === sm);
+    secEl.innerHTML = secs.length
+      ? secs.map(s => `<option value="${s.id}">Section ${s.name}</option>`).join('')
+      : '<option>No sections</option>';
+    onFinal();
+  }
+
+  yearEl.addEventListener('change', populateSem);
+  semEl.addEventListener('change', populateSec);
+  secEl.addEventListener('change', onFinal);
+
+  populateSem();
+}
+
+function renderGrid(sectionId, bodyId){
+  const secData = SECTION_SCHEDULE[sectionId] || {};
+  let html = '';
+  DAYS.forEach(day => {
+    html += `<tr><td class="tt-day"><b>${DAY_LABELS[day]}</b></td>`;
+    SLOTS.forEach(slot => {
+      const entries = (secData[day] && secData[day][slot]) ? secData[day][slot] : [];
+      if(!entries.length){
+        html += `<td><div class="tt-empty">—</div></td>`;
+      } else {
+        const e = entries[0];
+        html += `<td><div class="tt-cell${e.lab?' tt-lab':''}" title="${e.fac} • ${e.room}">
+          <strong>${e.sub}</strong>
+          <span class="tc-sub">${e.fac}</span>
+          <span class="tc-room">📍 ${e.room}</span>
+          ${e.lab ? '<span class="tc-sub" style="opacity:.7">🧪 Lab</span>' : ''}
+        </div></td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  document.getElementById(bodyId).innerHTML = html || '<tr><td colspan="7" class="no-data">No schedules generated yet.</td></tr>';
+}
+
+function renderDashGrid(){
+  const sec = document.getElementById('dashSection').value;
+  renderGrid(sec, 'dashGridBody');
+}
+function renderTTGrid(){
+  const sec = document.getElementById('ttSection').value;
+  renderGrid(sec, 'ttGridBody');
+}
+
+initYearSemSectionCascade('dashYear', 'dashSemester', 'dashSection', renderDashGrid);
+initYearSemSectionCascade('ttYear', 'ttSemester', 'ttSection', renderTTGrid);
+
+// ---- PAGES ----
+function showPage(name, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(el) el.classList.add('active');
+  const titles={dashboard:'Dashboard',timetables:'All Timetables',faculty:'Faculty',rooms:'Rooms',leaves:'Leave Requests',settings:'Settings'};
+  document.getElementById('pageTitle').textContent = titles[name]||name;
+  if(name==='dashboard'){renderDashGrid();}
+  if(name==='timetables'){renderTTGrid();}
+}
+
+// ---- FACULTY SEARCH ----
+function filterFaculty(v){
+  document.querySelectorAll('.faculty-row').forEach(row=>{
+    row.style.display = row.dataset.name.includes(v.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// ---- LEAVE FILTER ----
+function filterLeaveDisplay(status, el){
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  if(el) el.classList.add('active');
+  document.querySelectorAll('.leave-item').forEach(item=>{
+    item.style.display = (status==='all' || item.dataset.status===status) ? '' : 'none';
+  });
+}
+
+// ---- GENERATE CONFIRM ----
+function confirmGenerate(){
+  return confirm('⚠️ This will DELETE all existing timetable data and generate a new one. Continue?');
+}
+
+// ---- GENERATION LOG TOGGLE ----
+function toggleGenLog(){
+  const body = document.getElementById('genLogBody');
+  const header = document.getElementById('genLogHeader');
+  if(!body) return;
+  body.classList.toggle('hidden');
+  header.classList.toggle('collapsed');
+}
+
+// ---- TOAST ----
+function showToast(msg,dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',dur);
+}
+
+// ---- INIT ----
+showPage('dashboard', document.querySelector('.nav-item'));
+{% if messages %}
+  {% for message in messages %}
+    showToast("{{ message|escapejs }}");
+  {% endfor %}
+{% endif %}
+</script>
+</body>
+</html>

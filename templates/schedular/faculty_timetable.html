@@ -1,0 +1,553 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Timetable — {{ faculty.name }} | EduSchedule</title>
+<link rel="stylesheet" href="{% static 'css/shared.css' %}">
+<style>
+  .faculty-timetable-header {
+    background: linear-gradient(135deg, #6B3F5C, #D98CA0);
+    color: white;
+    padding: 32px;
+    border-radius: 16px;
+    margin-bottom: 24px;
+  }
+
+  .faculty-header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+  }
+
+  .faculty-header-left h1 {
+    font-size: 28px;
+    font-weight: 800;
+    margin: 0 0 8px 0;
+  }
+
+  .faculty-header-left p {
+    opacity: 0.9;
+    margin: 4px 0;
+    font-size: 14px;
+  }
+
+  .faculty-header-right {
+    display: flex;
+    gap: 16px;
+  }
+
+  .header-stat {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 12px 16px;
+    border-radius: 12px;
+    text-align: center;
+    min-width: 120px;
+  }
+
+  .header-stat-num {
+    font-size: 22px;
+    font-weight: 700;
+    display: block;
+  }
+
+  .header-stat-label {
+    font-size: 11px;
+    opacity: 0.85;
+    margin-top: 4px;
+  }
+
+  /* Timetable Grid Styles */
+  .timetable-grid-section {
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(80, 60, 55, 0.08);
+    margin-bottom: 24px;
+  }
+
+  .timetable-grid-header {
+    background: #FDF5F7;
+    padding: 16px 20px;
+    border-bottom: 2px solid #EDD9DF;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .timetable-grid-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .timetable-grid-header .actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .timetable-grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .timetable-grid-table thead {
+    background: #F6ECEF;
+    border-bottom: 2px solid #E5CDD5;
+  }
+
+  .timetable-grid-table th {
+    padding: 12px;
+    text-align: center;
+    font-weight: 700;
+    color: #3D2A38;
+    border-right: 1px solid #E5CDD5;
+    font-size: 12px;
+  }
+
+  .timetable-grid-table th:first-child {
+    text-align: left;
+    width: 80px;
+    background: #EDD9DF;
+    font-weight: 800;
+  }
+
+  .timetable-grid-table td {
+    padding: 0;
+    border-right: 1px solid #EDD9DF;
+    border-bottom: 1px solid #EDD9DF;
+    height: 80px;
+    width: auto;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .timetable-grid-table td:first-child {
+    background: #FDF5F7;
+    font-weight: 700;
+    padding: 12px;
+    text-align: left;
+    border-right: 2px solid #E5CDD5;
+  }
+
+  .tt-cell {
+    padding: 8px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .tt-cell:hover {
+    background: #F6ECEF;
+  }
+
+  .tt-cell.active {
+    background: #F5EBD8;
+    border-left: 3px solid #C9A15A;
+  }
+
+  .tt-cell-subject {
+    font-weight: 700;
+    font-size: 12px;
+    color: #3D2A38;
+  }
+
+  .tt-cell-section {
+    font-size: 11px;
+    color: #8C7683;
+  }
+
+  .tt-cell-room {
+    font-size: 10px;
+    color: #C9B3BE;
+    font-style: italic;
+  }
+
+  .tt-empty {
+    color: #E5CDD5;
+    font-size: 18px;
+  }
+
+  /* Stats Cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card-compact {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(80, 60, 55, 0.08);
+    border-left: 4px solid #6B3F5C;
+  }
+
+  .stat-card-compact h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: #8C7683;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-card-compact .value {
+    font-size: 24px;
+    font-weight: 800;
+    color: #3D2A38;
+  }
+
+  .stat-card-compact .details {
+    font-size: 11px;
+    color: #C9B3BE;
+    margin-top: 8px;
+  }
+
+  /* Summary Box */
+  .summary-box {
+    background: linear-gradient(135deg, #FBEFF3, #F0F5EC);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid #E5CDD5;
+  }
+
+  .summary-box h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    color: #3D2A38;
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .summary-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(80, 60, 55, 0.05);
+  }
+
+  .summary-item:last-child {
+    border-bottom: none;
+  }
+
+  .summary-label {
+    color: #8C7683;
+    font-weight: 600;
+  }
+
+  .summary-value {
+    color: #3D2A38;
+    font-weight: 700;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-primary {
+    background: #6B3F5C;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #4F2D45;
+    transform: translateY(-1px);
+  }
+
+  .btn-outline {
+    background: white;
+    color: #6B3F5C;
+    border: 1.5px solid #6B3F5C;
+  }
+
+  .btn-outline:hover {
+    background: #F6ECEF;
+  }
+
+  /* Back button */
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #6B3F5C;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 16px;
+    transition: all 0.2s;
+  }
+
+  .back-btn:hover {
+    gap: 12px;
+  }
+
+  /* Loading animation for workload bar */
+  .workload-bar {
+    width: 100%;
+    height: 8px;
+    background: #EDD9DF;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .workload-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6B3F5C, #D98CA0);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }
+
+  .no-schedules {
+    text-align: center;
+    padding: 40px;
+    color: #C9B3BE;
+  }
+
+  .no-schedules svg {
+    width: 64px;
+    height: 64px;
+    opacity: 0.3;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 768px) {
+    .faculty-header-content {
+      flex-direction: column;
+    }
+
+    .faculty-header-right {
+      width: 100%;
+      justify-content: space-around;
+    }
+
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .summary-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .timetable-grid-table {
+      font-size: 11px;
+    }
+
+    .timetable-grid-table th, .timetable-grid-table td {
+      padding: 8px;
+    }
+
+    .tt-cell {
+      min-height: 60px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app" style="background: #FDF5F7;">
+  <!-- Main Content -->
+  <div class="main" style="max-width: 100%; padding-top: 0;">
+    <!-- Back Button -->
+    {% if request.user.role == 'ADMIN' %}
+      <div style="padding: 20px 32px;">
+        <a href="{% url 'all_faculty_timetables_list' %}" class="back-btn">
+          ← Back to Faculty List
+        </a>
+      </div>
+    {% endif %}
+
+    <!-- HEADER SECTION -->
+    <div class="faculty-timetable-header" style="margin: 20px 32px 0 32px;">
+      <div class="faculty-header-content">
+        <div class="faculty-header-left">
+          <h1>{{ faculty.name }}</h1>
+          <p>📧 {{ faculty.email }}</p>
+          <p>Workload Limit: {{ stats.workload_limit }} hours/week</p>
+        </div>
+        <div class="faculty-header-right">
+          <div class="header-stat">
+            <span class="header-stat-num">{{ stats.total_sessions }}</span>
+            <span class="header-stat-label">Total Sessions</span>
+          </div>
+          <div class="header-stat">
+            <span class="header-stat-num">{{ stats.sections|length }}</span>
+            <span class="header-stat-label">Sections</span>
+          </div>
+          <div class="header-stat">
+            <span class="header-stat-num">{{ stats.subjects|length }}</span>
+            <span class="header-stat-label">Subjects</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUMMARY BOX -->
+    <div class="summary-box" style="margin: 20px 32px;">
+      <h3>📊 Quick Summary</h3>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span class="summary-label">Total Teaching Load:</span>
+          <span class="summary-value">{{ stats.total_sessions }}/{{ stats.workload_limit }} hours</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Workload Usage:</span>
+          <span class="summary-value">{{ stats.workload_percentage }}%</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Sections Taught:</span>
+          <span class="summary-value">{% for sec in stats.sections %}{{ sec }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Days Teaching:</span>
+          <span class="summary-value">{{ stats.days_teaching|length }}/6 days</span>
+        </div>
+      </div>
+      <div class="workload-bar">
+        <div class="workload-fill" style="width: {{ stats.workload_percentage }}%"></div>
+      </div>
+    </div>
+
+    <!-- STATS CARDS -->
+    <div class="stats-grid" style="margin: 20px 32px;">
+      <div class="stat-card-compact" style="border-left-color: #6B8E76;">
+        <h3>📚 Subjects</h3>
+        <div class="value">{{ stats.subjects|length }}</div>
+        <div class="details">
+          {% for subj in stats.subjects %}
+            {{ subj }}{% if not forloop.last %}<br>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="stat-card-compact" style="border-left-color: #D98CA0;">
+        <h3>🏢 Sections</h3>
+        <div class="value">{{ stats.sections|length }}</div>
+        <div class="details">
+          {% for sec in stats.sections %}
+            {{ sec }}{% if not forloop.last %}<br>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="stat-card-compact" style="border-left-color: #9C5476;">
+        <h3>📅 Teaching Days</h3>
+        <div class="value">{{ stats.days_teaching|length }}</div>
+        <div class="details">
+          {% for day in stats.days_teaching %}
+            {{ day }}{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="stat-card-compact" style="border-left-color: #C9A15A;">
+        <h3>⚡ Capacity</h3>
+        <div class="value">{{ stats.workload_percentage }}%</div>
+        <div class="details">{{ stats.total_sessions }}/{{ stats.workload_limit }} hours used</div>
+      </div>
+    </div>
+
+    <!-- TIMETABLE SECTION -->
+    <div style="margin: 20px 32px;">
+      <div class="timetable-grid-section">
+        <div class="timetable-grid-header">
+          <h2>📋 Weekly Timetable</h2>
+          <div class="actions">
+            <a href="{% url 'export_faculty_timetable_pdf' %}" class="btn btn-outline" title="Export as PDF">
+              📄 Export PDF
+            </a>
+            {% if request.user.role == 'FACULTY' %}
+              <a href="{% url 'faculty_schedule_by_day' %}" class="btn btn-outline" title="Detailed view by day">
+                📅 By Day
+              </a>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if timetable_grid %}
+          <table class="timetable-grid-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                {% for slot in timetable_grid.0.1 %}
+                  {% if forloop.counter <= max_slot %}
+                    <th>P{{ forloop.counter }}</th>
+                  {% endif %}
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for day, slots in timetable_grid %}
+              <tr>
+                <td><strong>{{ day }}</strong></td>
+                {% for schedule in slots %}
+                  <td>
+                    {% if schedule %}
+                      <div class="tt-cell" title="Click for details">
+                        <div class="tt-cell-subject">{{ schedule.subject.name }}</div>
+                        <div class="tt-cell-section">{{ schedule.section.name }}</div>
+                        <div class="tt-cell-room">📍 {{ schedule.room.name }}</div>
+                      </div>
+                    {% else %}
+                      <div class="tt-cell">
+                        <span class="tt-empty">—</span>
+                      </div>
+                    {% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="no-schedules">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <h3>No Schedules</h3>
+            <p>No timetable data available. Please generate the timetable.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// Tooltip on hover
+document.querySelectorAll('.tt-cell').forEach(cell => {
+  cell.addEventListener('click', function() {
+    const content = this.textContent;
+    if (content.trim() !== '—') {
+      console.log('Cell clicked:', content);
+    }
+  });
+});
+</script>
+</body>
+</html>

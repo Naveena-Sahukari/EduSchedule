@@ -1,0 +1,441 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schedule by Day — {{ faculty.name }} | EduSchedule</title>
+<link rel="stylesheet" href="{% static 'css/shared.css' %}">
+<style>
+  body {
+    background: #FDF5F7;
+  }
+
+  .schedule-container {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .faculty-header-detailed {
+    background: linear-gradient(135deg, #6B3F5C, #D98CA0);
+    color: white;
+    padding: 32px;
+    border-radius: 14px;
+    margin-bottom: 24px;
+  }
+
+  .faculty-header-detailed h1 {
+    font-size: 28px;
+    font-weight: 800;
+    margin: 0 0 12px 0;
+  }
+
+  .faculty-header-detailed p {
+    opacity: 0.9;
+    margin: 6px 0;
+    font-size: 14px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #6B3F5C;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 20px;
+    transition: gap 0.2s;
+  }
+
+  .back-link:hover {
+    gap: 12px;
+  }
+
+  /* Day Sections */
+  .day-section {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(80, 60, 55, 0.08);
+    border-left: 4px solid #6B3F5C;
+  }
+
+  .day-section.empty {
+    opacity: 0.6;
+    border-left-color: #E5CDD5;
+  }
+
+  .day-header {
+    background: linear-gradient(135deg, #F6ECEF, #EDD9DF);
+    padding: 16px 20px;
+    border-bottom: 1px solid #E5CDD5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .day-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+    color: #3D2A38;
+  }
+
+  .day-badge {
+    background: #6B3F5C;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .day-badge.no-class {
+    background: #E5CDD5;
+  }
+
+  .day-content {
+    padding: 0;
+  }
+
+  .schedule-item {
+    padding: 16px 20px;
+    border-bottom: 1px solid #EDD9DF;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+  }
+
+  .schedule-item:last-child {
+    border-bottom: none;
+  }
+
+  .schedule-item:hover {
+    background: #FDF5F7;
+  }
+
+  .schedule-item-left {
+    flex: 1;
+  }
+
+  .schedule-item-right {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .slot-badge {
+    background: #6B3F5C;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 50px;
+    text-align: center;
+  }
+
+  .slot-time {
+    font-size: 11px;
+    color: #C9B3BE;
+    margin-top: 4px;
+  }
+
+  .schedule-details {
+    flex: 1;
+  }
+
+  .subject-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #3D2A38;
+    margin: 0 0 4px 0;
+  }
+
+  .schedule-info {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #8C7683;
+  }
+
+  .info-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .section-label {
+    background: #F6ECEF;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+  }
+
+  .room-label {
+    background: #F5EBD8;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    color: #9C7A3E;
+  }
+
+  .lab-badge {
+    background: #FBEFF3;
+    color: #6B3F5C;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .no-class-message {
+    padding: 20px;
+    text-align: center;
+    color: #C9B3BE;
+    font-size: 14px;
+  }
+
+  /* Summary Stats */
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(80, 60, 55, 0.08);
+    border-top: 3px solid #6B3F5C;
+  }
+
+  .stat-card h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: #8C7683;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-card .value {
+    font-size: 24px;
+    font-weight: 800;
+    color: #3D2A38;
+  }
+
+  .stat-card .details {
+    font-size: 11px;
+    color: #C9B3BE;
+    margin-top: 6px;
+  }
+
+  /* Action Buttons */
+  .action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-primary {
+    background: #6B3F5C;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #4F2D45;
+    transform: translateY(-1px);
+  }
+
+  .btn-outline {
+    background: white;
+    color: #6B3F5C;
+    border: 1.5px solid #6B3F5C;
+  }
+
+  .btn-outline:hover {
+    background: #F6ECEF;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .schedule-item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .schedule-item-right {
+      width: 100%;
+      flex-direction: column;
+    }
+
+    .schedule-info {
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .day-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .summary-stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .action-buttons {
+      flex-direction: column;
+    }
+
+    .btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="schedule-container" style="padding: 24px;">
+  <!-- Back Button -->
+  {% if request.user.role == 'ADMIN' %}
+    <a href="{% url 'all_faculty_timetables_list' %}" class="back-link">← Back to Faculty List</a>
+  {% else %}
+    <a href="{% url 'faculty_dashboard' %}" class="back-link">← Back to Dashboard</a>
+  {% endif %}
+
+  <!-- Header -->
+  <div class="faculty-header-detailed">
+    <h1>{{ faculty.name }}</h1>
+    <p>📧 Email: {{ faculty.email }}</p>
+    <p>⏰ Workload Limit: {{ faculty.workload_limit }} hours/week</p>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="summary-stats">
+    <div class="stat-card">
+      <h3>📊 Total Sessions</h3>
+      <div class="value">{{ total_sessions }}</div>
+      <div class="details">Teaching hours/week</div>
+    </div>
+
+    <div class="stat-card" style="border-top-color: #D98CA0;">
+      <h3>🏢 Sections</h3>
+      <div class="value">
+        {% regroup schedule_by_day.values by section.id as sections_list %}
+        {{ schedule_by_day.MON|length|add:schedule_by_day.TUE|length|add:schedule_by_day.WED|length|add:schedule_by_day.THU|length|add:schedule_by_day.FRI|length|add:schedule_by_day.SAT|length }}
+      </div>
+      <div class="details">Unique sections taught</div>
+    </div>
+
+    <div class="stat-card" style="border-top-color: #6B8E76;">
+      <h3>📚 Subjects</h3>
+      <div class="value">
+        {% regroup schedule_by_day.MON by subject.id as subjects_list %}
+        {{ subjects_list|length }}
+      </div>
+      <div class="details">Different subjects</div>
+    </div>
+
+    <div class="stat-card" style="border-top-color: #C9A15A;">
+      <h3>📅 Teaching Days</h3>
+      <div class="value">
+        {% if schedule_by_day.MON %}1{% endif %}
+        {% if schedule_by_day.TUE %}{% if schedule_by_day.MON %}+{% endif %}1{% endif %}
+        {% if schedule_by_day.WED %}{% if schedule_by_day.MON or schedule_by_day.TUE %}+{% endif %}1{% endif %}
+      </div>
+      <div class="details">Days with classes</div>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="action-buttons">
+    <a href="{% url 'view_faculty_timetable' %}" class="btn btn-outline">📋 Grid View</a>
+    <a href="{% url 'export_faculty_timetable_pdf' %}" class="btn btn-primary">📄 Export PDF</a>
+  </div>
+
+  <!-- Schedule by Day -->
+  {% for day, schedules in schedule_by_day.items %}
+    <div class="day-section {% if not schedules %}empty{% endif %}">
+      <div class="day-header">
+        <h2>{{ day }}</h2>
+        <div class="day-badge {% if not schedules %}no-class{% endif %}">
+          {% if schedules %}{{ schedules|length }} class{{ schedules|length|pluralize }}{% else %}No classes{% endif %}
+        </div>
+      </div>
+
+      <div class="day-content">
+        {% if schedules %}
+          {% for schedule in schedules %}
+            <div class="schedule-item">
+              <div class="schedule-details">
+                <p class="subject-name">{{ schedule.subject.name }}</p>
+                <div class="schedule-info">
+                  <div class="info-item">
+                    <span class="section-label">{{ schedule.section.name }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="room-label">📍 {{ schedule.room.name }}</span>
+                  </div>
+                  {% if schedule.subject.is_lab %}
+                    <div class="info-item">
+                      <span class="lab-badge">🧪 LAB</span>
+                    </div>
+                  {% endif %}
+                  {% if schedule.batch %}
+                    <div class="info-item">
+                      {{ schedule.batch.name }}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="schedule-item-right">
+                <div style="text-align: right;">
+                  <div class="slot-badge">P{{ schedule.timeslot.slot_number }}</div>
+                  <div class="slot-time">
+                    {% if schedule.timeslot.slot_number == 1 %}9:00 - 10:00{% endif %}
+                    {% if schedule.timeslot.slot_number == 2 %}10:00 - 11:00{% endif %}
+                    {% if schedule.timeslot.slot_number == 3 %}11:00 - 12:00{% endif %}
+                    {% if schedule.timeslot.slot_number == 4 %}12:00 - 1:00{% endif %}
+                    {% if schedule.timeslot.slot_number == 5 %}2:00 - 3:00{% endif %}
+                    {% if schedule.timeslot.slot_number == 6 %}3:00 - 4:00{% endif %}
+                    {% if schedule.timeslot.slot_number == 7 %}4:00 - 5:00{% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="no-class-message">
+            No classes scheduled
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+
+</div>
+</body>
+</html>

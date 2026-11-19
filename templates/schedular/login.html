@@ -1,0 +1,126 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduSchedule — Login</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:#FDF5F7;min-height:100vh;display:flex;align-items:center;justify-content:center}
+:root{
+  --grad:linear-gradient(135deg,#6B3F5C,#9C5476,#D98CA0);
+  --accent:#6B3F5C;--accent2:#D98CA0;--border:#EDD9DF;--text:#3D2A38;--muted:#8C7683;
+  --radius:14px;--radius-lg:20px;
+}
+.container{display:flex;width:100%;min-height:100vh}
+.left-panel{
+  width:50%;background:var(--grad);
+  padding:50px;color:#fff;display:flex;flex-direction:column;justify-content:center;
+}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:56px}
+.brand-icon{
+  width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+}
+.brand span{font-size:20px;font-weight:700}
+.welcome h1{font-size:48px;font-weight:800;line-height:1.1;margin-bottom:16px}
+.welcome p{font-size:16px;opacity:.85;line-height:1.7;margin-bottom:40px;max-width:420px}
+.steps{display:flex;flex-direction:column;gap:14px}
+.step{
+  display:flex;align-items:center;gap:14px;
+  background:rgba(255,255,255,.12);border-radius:16px;
+  padding:18px 22px;font-size:15px;backdrop-filter:blur(10px);
+}
+.step-num{
+  width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;
+}
+.right-panel{width:50%;background:#fff;display:flex;align-items:center;justify-content:center;padding:60px}
+.login-box{width:100%;max-width:420px}
+.login-box h2{font-size:30px;font-weight:800;margin-bottom:8px;color:var(--text)}
+.login-box .sub{color:var(--muted);font-size:15px;margin-bottom:32px}
+.form-group{margin-bottom:22px}
+.form-group label{display:block;font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text)}
+.form-group input{
+  width:100%;padding:14px 16px;border:1.5px solid var(--border);
+  border-radius:var(--radius);font-size:14px;outline:none;transition:.2s;
+}
+.form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(107,63,92,.14)}
+.login-btn{
+  width:100%;padding:15px;border:none;border-radius:30px;
+  background:linear-gradient(135deg,#6B3F5C,#D98CA0);
+  color:#fff;font-size:15px;font-weight:700;cursor:pointer;transition:.2s;
+  margin-top:6px;
+}
+.login-btn:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 8px 24px rgba(107,63,92,.3)}
+.msg{padding:12px 16px;border-radius:12px;margin-bottom:18px;font-size:13px}
+.msg.error{background:#F5DEE3;color:#7A2E42}
+.msg.success{background:#E9F2E6;color:#4B6350}
+.csrf-note{font-size:11px;color:var(--muted);text-align:center;margin-top:16px;opacity:.7}
+@media(max-width:900px){
+  .container{flex-direction:column}
+  .left-panel,.right-panel{width:100%}
+  .left-panel{padding:30px;min-height:auto}
+  .welcome h1{font-size:32px}
+  .right-panel{padding:30px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+    <div class="brand">
+      <div class="brand-icon">📅</div>
+      <span>EduSchedule</span>
+    </div>
+    <div class="welcome">
+      <h1>Welcome Back</h1>
+      <p>Access your personalized dashboard to view schedules, manage classes, and stay updated with real-time changes.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div>Enter your College ID</div>
+        <div class="step"><div class="step-num">2</div>Enter your password</div>
+        <div class="step"><div class="step-num">3</div>Access your role-based dashboard</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="login-box">
+      <h2>Sign in to your account</h2>
+      <p class="sub">Enter your credentials to access your dashboard</p>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="msg {{ message.tags }}">
+            {% if message.tags == 'error' %}❌{% else %}✅{% endif %} {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      <form method="POST" action="{% url 'login' %}">
+        {% csrf_token %}
+        <div class="form-group">
+          <label for="username">College ID / Username</label>
+          <input type="text" id="username" name="username"
+                 placeholder="Enter your college ID"
+                 value="{{ request.POST.username|default:'' }}"
+                 autocomplete="username" required autofocus>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password"
+                 placeholder="Enter your password"
+                 autocomplete="current-password" required>
+        </div>
+        <button class="login-btn" type="submit">Sign In →</button>
+      </form>
+
+      <p class="csrf-note">🔒 Secured with CSRF protection</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

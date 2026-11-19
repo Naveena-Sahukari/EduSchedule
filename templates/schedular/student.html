@@ -1,0 +1,345 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Dashboard — EduSchedule</title>
+<link rel="stylesheet" href="{% static 'css/shared.css' %}">
+</head>
+<body>
+<div class="app">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📅</div>
+    <span>EduSchedule</span>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="nav-item active" onclick="showPage('dashboard',this)">
+      <span class="nav-icon">🏠</span> Dashboard
+    </button>
+    <button class="nav-item" onclick="showPage('timetable',this)">
+      <span class="nav-icon">📋</span> Timetable
+    </button>
+    <button class="nav-item" onclick="showPage('faculty',this)">
+      <span class="nav-icon">👨‍🏫</span> Faculty
+    </button>
+    <button class="nav-item" onclick="showPage('upcoming',this)">
+      <span class="nav-icon">⏰</span> Upcoming
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="avatar" style="background:linear-gradient(135deg,#9CB59A,#6B8E76)">
+        {{ request.user.get_full_name|default:request.user.username|first|upper }}
+      </div>
+      <div class="user-info">
+        <h4>{{ request.user.get_full_name|default:request.user.username }}</h4>
+        <p>Student</p>
+        <a class="logout-btn" href="{% url 'logout' %}">Logout →</a>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="pageTitle">Dashboard</span>
+    <div class="topbar-right">
+      <button class="notif-btn">🔔<span class="notif-dot"></span></button>
+    </div>
+  </div>
+
+  {% if error_message %}
+  <div style="padding:28px 32px">
+    <div class="alert alert-error">⚠️ {{ error_message }}</div>
+  </div>
+  {% else %}
+
+  <div class="page-wrap">
+
+    <!-- ========== DASHBOARD ========== -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h1 id="stuGreet">Hello, {{ request.user.get_full_name|default:request.user.username }} 👋</h1>
+        <p>
+          {% if request.user.section %}
+            {{ request.user.section.semester.department.name }} ·
+            Semester {{ request.user.section.semester.number }} ·
+            Section {{ request.user.section.name }}
+          {% endif %}
+        </p>
+      </div>
+
+      <!-- Hero + Coming Up -->
+      <div class="grid-hero">
+        <div class="hero-card">
+          {% if current_class %}
+            <div class="hero-label">⏱️ Currently in Class</div>
+            <h2>{{ current_class.subject.name }}</h2>
+            <div class="hero-meta">
+              <span>📍 {{ current_class.room.name }}</span>
+              <span>👥 {{ current_class.section.name }}</span>
+              <span>{% if current_class.subject.is_lab %}🧪 Lab{% else %}📖 Theory{% endif %}</span>
+              <span>🕐 Slot {{ current_class.timeslot.slot_number }}</span>
+            </div>
+          {% elif next_class %}
+            <div class="hero-label">⏰ Next Class</div>
+            <h2>{{ next_class.subject.name }}</h2>
+            <div class="hero-meta">
+              <span>📍 {{ next_class.room.name }}</span>
+              <span>👤 {{ next_class.faculty.name }}</span>
+              <span>🕐 Slot {{ next_class.timeslot.slot_number }}</span>
+            </div>
+          {% else %}
+            <div class="hero-label">📋 Today's Status</div>
+            <h2>No class right now</h2>
+            <div class="hero-meta"><span>Enjoy your free time!</span></div>
+          {% endif %}
+        </div>
+
+        <!-- Coming Up -->
+        <div class="box">
+          <div class="box-header"><h2>Coming Up Today</h2></div>
+          {% if today_schedules %}
+            {% for sch in today_schedules %}
+            <div class="upcoming-item">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div>
+                  <div class="up-time">Slot {{ sch.timeslot.slot_number }}</div>
+                  <h4>
+                    {{ sch.subject.name }}
+                    {% if sch.subject.is_lab %}<span class="badge badge-lab">LAB</span>{% endif %}
+                  </h4>
+                  <p>{{ sch.faculty.name }}</p>
+                </div>
+                <span class="up-room">📍 {{ sch.room.name }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <p class="no-data">No classes today</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card" style="background:linear-gradient(135deg,#F2C9D4,#9C5476)">
+          <div class="stat-icon">📚</div>
+          <h3>Classes Today</h3>
+          <div class="stat-num">{{ today_classes_count }}</div>
+          <div class="stat-sub">Scheduled for today</div>
+        </div>
+        <div class="stat-card" style="background:linear-gradient(135deg,#C9B3BE,#8C7683)">
+          <div class="stat-icon">📅</div>
+          <h3>Weekly Total</h3>
+          <div class="stat-num">{{ weekly_classes }}</div>
+          <div class="stat-sub">Periods per week</div>
+        </div>
+        <div class="stat-card" style="background:linear-gradient(135deg,#9CB59A,#6B8E76)">
+          <div class="stat-icon">📖</div>
+          <h3>Total Subjects</h3>
+          <div class="stat-num">{{ total_subjects }}</div>
+          <div class="stat-sub">This semester</div>
+        </div>
+        <div class="stat-card" style="background:linear-gradient(135deg,#6B3F5C,#D98CA0)">
+          <div class="stat-icon">👨‍🏫</div>
+          <h3>Faculty</h3>
+          <div class="stat-num">{{ faculty_list|length }}</div>
+          <div class="stat-sub">Teaching you</div>
+        </div>
+      </div>
+
+      <!-- Faculty Cards -->
+      <div class="grid-2">
+        <div class="box">
+          <div class="box-header">
+            <h2>Your Faculty</h2>
+            <button class="btn btn-outline btn-sm" onclick="showPage('faculty',null)">View All</button>
+          </div>
+          {% for f in faculty_list|slice:":4" %}
+          <div class="item-card">
+            <div class="item-card-left">
+              <div class="avatar purple" style="width:34px;height:34px;font-size:13px">{{ f.name|first|upper }}</div>
+              <div>
+                <h4>{{ f.name }}</h4>
+                <p>{{ f.subjects }}</p>
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <p class="no-data">No faculty assigned</p>
+          {% endfor %}
+        </div>
+
+        <div class="box">
+          <div class="box-header">
+            <h2>Upcoming Classes</h2>
+            <button class="btn btn-outline btn-sm" onclick="showPage('upcoming',null)">View All</button>
+          </div>
+          {% for sch in upcoming_classes|slice:":4" %}
+          <div class="upcoming-item">
+            <div class="up-time">{{ sch.timeslot.get_day_display }} · Slot {{ sch.timeslot.slot_number }}</div>
+            <h4>{{ sch.subject.name }}</h4>
+            <p>{{ sch.faculty.name }} · {{ sch.room.name }}</p>
+          </div>
+          {% empty %}
+          <p class="no-data">No upcoming classes</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== TIMETABLE ========== -->
+    <div class="page" id="page-timetable">
+      <div class="page-header">
+        <h1>My Timetable</h1>
+        <p>
+          {% if request.user.section %}
+            Section {{ request.user.section.name }} — Semester {{ request.user.section.semester.number }}
+          {% endif %}
+        </p>
+      </div>
+      <div class="box">
+        <div class="box-header">
+          <h2>Weekly Schedule</h2>
+          <a href="{% url 'export_pdf' %}" class="btn btn-outline btn-sm">📄 Export PDF</a>
+        </div>
+        <div class="table-wrap">
+          <table class="tt-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>P1 9:00</th>
+                <th>P2 10:00</th>
+                <th>P3 11:00</th>
+                <th>P4 12:00</th>
+                <th>P5 14:00</th>
+                <th>P6 15:00</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for day_name, row in timetable_grid %}
+              <tr>
+                <td class="tt-day"><b>{{ day_name }}</b></td>
+                {% for sch in row %}
+                  {% if sch %}
+                  <td>
+                    <div class="tt-cell" title="{{ sch.faculty.name }} • {{ sch.room.name }}">
+                      <strong>{{ sch.subject.name }}</strong>
+                      <span class="tc-sub">{{ sch.faculty.name }}</span>
+                      <span class="tc-room">📍 {{ sch.room.name }}</span>
+                      {% if sch.subject.is_lab %}<span class="tc-sub" style="opacity:.7">🧪 Lab</span>{% endif %}
+                    </div>
+                  </td>
+                  {% else %}
+                  <td><div class="tt-empty">—</div></td>
+                  {% endif %}
+                {% endfor %}
+              </tr>
+              {% empty %}
+              <tr><td colspan="7" class="no-data">No timetable generated yet</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== FACULTY ========== -->
+    <div class="page" id="page-faculty">
+      <div class="page-header">
+        <h1>Your Faculty</h1>
+        <p>Faculty members teaching your section</p>
+      </div>
+      <div class="box" style="margin-bottom:20px">
+        <div class="search-box" style="width:100%;max-width:400px">
+          <span>🔍</span>
+          <input placeholder="Search faculty by name or subject..." oninput="filterFaculty(this.value)">
+        </div>
+      </div>
+      <div id="stuFacultyList" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        {% for f in faculty_list %}
+        <div class="box faculty-card" style="padding:20px" data-name="{{ f.name|lower }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="avatar purple" style="width:44px;height:44px;font-size:17px">{{ f.name|first|upper }}</div>
+              <div>
+                <h3 style="font-size:15px;font-weight:700">{{ f.name }}</h3>
+                <p style="font-size:12px;color:var(--muted)">{{ f.subjects }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div style="grid-column:1/-1">
+          <p class="no-data">No faculty data available</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ========== UPCOMING ========== -->
+    <div class="page" id="page-upcoming">
+      <div class="page-header">
+        <h1>Upcoming Classes</h1>
+        <p>Your next scheduled classes</p>
+      </div>
+      <div class="box">
+        {% if upcoming_classes %}
+          {% for sch in upcoming_classes %}
+          <div class="upcoming-item">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div class="up-time">{{ sch.timeslot.get_day_display }} · Slot {{ sch.timeslot.slot_number }}</div>
+                <h4>
+                  {{ sch.subject.name }}
+                  {% if sch.subject.is_lab %}<span class="badge badge-lab">LAB</span>{% endif %}
+                </h4>
+                <p>{{ sch.faculty.name }}</p>
+              </div>
+              <span class="up-room">📍 {{ sch.room.name }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="no-data">No upcoming classes scheduled</p>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+  {% endif %}
+</div>
+</div>
+
+<script>
+function showPage(name, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(el) el.classList.add('active');
+  const titles={dashboard:'Dashboard',timetable:'Timetable',faculty:'Faculty',upcoming:'Upcoming Classes'};
+  document.getElementById('pageTitle').textContent = titles[name]||name;
+}
+
+function filterFaculty(v){
+  document.querySelectorAll('.faculty-card').forEach(card=>{
+    card.style.display = card.dataset.name.includes(v.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// Greeting
+const hour = new Date().getHours();
+const greet = hour<12?'Good Morning':hour<17?'Good Afternoon':'Good Evening';
+const gh = document.getElementById('stuGreet');
+if(gh) gh.textContent = `${greet}, {{ request.user.get_full_name|default:request.user.username|escapejs }} 👋`;
+
+showPage('dashboard', document.querySelector('.nav-item'));
+</script>
+</body>
+</html>
