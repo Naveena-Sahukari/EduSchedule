@@ -20,7 +20,27 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-only-insecure-key')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [
+    h.strip() for h in
+    os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if h.strip()
+]
+
+# Railway provides this automatically once a public domain is generated
+RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+if RAILWAY_PUBLIC_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in
+    os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+    if o.strip()
+]
+if RAILWAY_PUBLIC_DOMAIN:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RAILWAY_PUBLIC_DOMAIN}')
+
+# Railway terminates HTTPS at its proxy
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # -------------------------------------------------
@@ -49,6 +69,9 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
 
     'django.middleware.security.SecurityMiddleware',
+
+    # Serves static files in production
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 
     'django.contrib.sessions.middleware.SessionMiddleware',
 
@@ -109,6 +132,8 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # -------------------------------------------------
 # DATABASE
 # -------------------------------------------------
+# Reads DB_* variables first (local use), then falls back to the
+# MYSQL* variables that Railway's MySQL service provides.
 
 DATABASES = {
 
@@ -116,15 +141,19 @@ DATABASES = {
 
         'ENGINE': 'django.db.backends.mysql',
 
-        'NAME': os.environ.get('DB_NAME', 'intellisched'),
+        'NAME': os.environ.get('DB_NAME') or os.environ.get('MYSQLDATABASE', 'intellisched'),
 
-        'USER': os.environ.get('DB_USER', 'root'),
+        'USER': os.environ.get('DB_USER') or os.environ.get('MYSQLUSER', 'root'),
 
-        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+        'PASSWORD': os.environ.get('DB_PASSWORD') or os.environ.get('MYSQLPASSWORD', ''),
 
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'HOST': os.environ.get('DB_HOST') or os.environ.get('MYSQLHOST', 'localhost'),
 
-        'PORT': os.environ.get('DB_PORT', '3306'),
+        'PORT': os.environ.get('DB_PORT') or os.environ.get('MYSQLPORT', '3306'),
+
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+        },
 
     }
 
@@ -180,6 +209,16 @@ STATICFILES_DIRS = [
 ]
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
+
 
 # -------------------------------------------------
 # MEDIA FILES
